@@ -48,6 +48,8 @@ def ingest_raw_event(
         return {
             "raw_event_id": existing["id"],
             "alert_id": payload_dict.get("id") or existing["id"],
+            "payload_hash": idem_key,
+            "idempotency_key": idem_key,
             "deduplicated": True,
             "received_at": existing["received_at"],
             "payload": json.loads(existing["raw_payload"]),
@@ -67,7 +69,10 @@ def ingest_raw_event(
     return {
         "raw_event_id": raw_id,
         "alert_id": alert_id,
+        "payload_hash": idem_key,
+        "idempotency_key": idem_key,
         "deduplicated": False,
         "received_at": now,
         "payload": payload_dict,
     }
+
