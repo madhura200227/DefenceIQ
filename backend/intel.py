@@ -26,8 +26,9 @@ def lookup_ip_local(ip: str) -> dict[str, Any]:
     }
 
 
-def map_mitre_technique(alert_type: str) -> tuple[str, str]:
-    return MITRE.get(alert_type, ("n/a", "unmapped"))
+def map_mitre_technique(atype: str = "", alert_type: str = "") -> tuple[str, str]:
+    key = atype or alert_type
+    return MITRE.get(key, ("n/a", "unmapped"))
 
 
 async def enrich_ip_indicator(db: DatabaseAdapter, ip: str, alert_type: str = "") -> dict[str, Any]:
@@ -94,3 +95,4 @@ async def enrich_ip_indicator(db: DatabaseAdapter, ip: str, alert_type: str = ""
     )
     db.commit()
     return result
+
