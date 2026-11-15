@@ -114,7 +114,8 @@ async def reset_scenario() -> dict[str, Any]:
         if not fut.done():
             fut.cancel()
     PENDING.clear()
-    _orch._LAST_HASH = "GENESIS"
+    last_audit = DB.execute("SELECT row_hash FROM audit ORDER BY n DESC LIMIT 1").fetchone()
+    _orch._LAST_HASH = str(last_audit["row_hash"]) if (last_audit and last_audit.get("row_hash")) else "GENESIS"
     DB.reset_runtime_tables()
     return {"reset": True, "status": "clean"}
 
@@ -134,11 +135,11 @@ def audit(alert_id: str = "") -> list[dict[str, Any]]:
     q = (
         "SELECT * FROM audit"
         + (" WHERE alert_id=?" if alert_id else "")
-        + " ORDER BY id ASC"
+        + " ORDER BY n ASC"
     )
     rows = DB.execute(q, (alert_id,) if alert_id else ()).fetchall()
     return [
-        {**r, "n": r["id"], "data": json.loads(r["data"] or "{}")}
+        {**r, "data": json.loads(r["data"] or "{}")}
         for r in rows
     ]
 
