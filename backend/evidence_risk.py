@@ -21,6 +21,20 @@ def is_prompt_injection(text: str) -> bool:
     return bool(INJECTION.search(text or ""))
 
 
+def quarantine_untrusted_logs(
+    lines: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Splits raw log lines into (safe_lines, quarantined_lines) by scanning for prompt injection."""
+    safe: list[dict[str, Any]] = []
+    quarantined: list[dict[str, Any]] = []
+    for line in lines:
+        if is_prompt_injection(str(line.get("msg", ""))):
+            quarantined.append(line)
+        else:
+            safe.append(line)
+    return safe, quarantined
+
+
 def verify_and_persist_evidence(
     db: DatabaseAdapter,
     *,
@@ -129,3 +143,4 @@ def calculate_explainable_risk(
         )
     db.commit()
     return breakdown
+
