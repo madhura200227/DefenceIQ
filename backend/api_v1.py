@@ -161,7 +161,6 @@ def list_incidents(
             {
                 **r,
                 "risk_breakdown": json.loads(r["risk_breakdown"] or "{}"),
-                "metadata": json.loads(r["metadata"] or "{}"),
                 "alert_ids": [a["id"] for a in alert_rows],
             }
         )
@@ -174,19 +173,18 @@ def create_manual_incident(req: IncidentCreateRequest) -> dict[str, Any]:
     now = time.time()
     DB.execute(
         """INSERT INTO incidents(
-            id,title,status,priority,risk_score,risk_breakdown,correlation_rationale,created_at,updated_at,metadata
-        ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            id,title,status,priority,risk_score,risk_breakdown,correlation_rationale,created_at,updated_at
+        ) VALUES(?,?,?,?,?,?,?,?,?)""",
         (
             inc_id,
             req.title,
             "investigating",
             req.priority,
             50.0,
-            json.dumps({"manual": True}),
+            json.dumps({"manual": True, "metadata": req.metadata}),
             req.rationale,
             now,
             now,
-            json.dumps(req.metadata),
         ),
     )
     for aid in req.alert_ids:
@@ -245,7 +243,6 @@ def get_incident_detail(incident_id: str) -> dict[str, Any]:
     return {
         **inc,
         "risk_breakdown": json.loads(inc["risk_breakdown"] or "{}"),
-        "metadata": json.loads(inc["metadata"] or "{}"),
         "alerts": alerts,
     }
 
@@ -263,10 +260,17 @@ def get_incident_evidence(incident_id: str) -> dict[str, Any]:
             f"SELECT * FROM evidence WHERE alert_id IN ({placeholders}) ORDER BY id ASC",
             tuple(alert_ids),
         ).fetchall()
-    items = [
-        {**r, "citations": json.loads(r["citations"] or "[]"), "verified": bool(r["verified"])}
-        for r in rows
-    ]
+    items = []
+    for r in rows:
+        refs = json.loads(r.get("source_refs") or "[]")
+        items.append(
+            {
+                **r,
+                "source_refs": refs,
+                "citations": refs,
+                "verified": bool(r["verified"]),
+            }
+        )
     return {"incident_id": real_inc_id, "items": items, "count": len(items)}
 
 
@@ -277,7 +281,7 @@ def get_incident_timeline(incident_id: str) -> dict[str, Any]:
         return {"incident_id": real_inc_id, "timeline": [], "audit_events": []}
     placeholders = ",".join("?" for _ in alert_ids)
     audit_rows = DB.execute(
-        f"SELECT * FROM audit WHERE alert_id IN ({placeholders}) ORDER BY id ASC",
+        f"SELECT * FROM audit WHERE alert_id IN ({placeholders}) ORDER BY n ASC",
         tuple(alert_ids),
     ).fetchall()
     timeline_lines: list[str] = []
@@ -308,7 +312,10 @@ def get_incident_analysis(incident_id: str) -> dict[str, Any]:
             f"SELECT * FROM agent_runs WHERE alert_id IN ({placeholders}) ORDER BY id ASC",
             tuple(alert_ids),
         ).fetchall()
-    items = [{**r, "envelope": json.loads(r["envelope"] or "{}")} for r in rows]
+    items = []
+    for r in rows:
+        env = json.loads(r.get("output") or "{}")
+        items.append({**r, "output": env, "envelope": env})
     return {"incident_id": real_inc_id, "agent_runs": items, "count": len(items)}
 
 
@@ -366,7 +373,7 @@ def get_v1_audit_logs(
     alert_id: str | None = Query(default=None),
     agent: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    all_rows = DB.execute("SELECT * FROM audit ORDER BY id ASC").fetchall()
+    all_rows = DB.execute("SELECT * FROM audit ORDER BY n ASC").fetchall()
     chain_valid = _verify_audit_chain(all_rows)
 
     filtered = all_rows
