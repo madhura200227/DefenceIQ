@@ -308,7 +308,7 @@ class DatabaseAdapter:
                 import psycopg
                 from psycopg.rows import dict_row
 
-                self._pg_conn = psycopg.connect(url, autocommit=False, row_factory=dict_row, connect_timeout=5)
+                self._pg_conn = psycopg.connect(url, autocommit=False, row_factory=dict_row, connect_timeout=2)
                 self.backend_type = "postgresql"
                 self.init_schema()
                 return
@@ -380,6 +380,10 @@ class DatabaseAdapter:
             elif self._sqlite_conn is not None:
                 self._sqlite_conn.commit()
 
+    @property
+    def is_postgres(self) -> bool:
+        return self.backend_type == "postgresql"
+
     def reset_mutable_tables(self) -> None:
         """Clears non-audit operational tables so scenarios can be re-run without server restart."""
         tables = (
@@ -397,3 +401,8 @@ class DatabaseAdapter:
             for tbl in tables:
                 self.execute(f"DELETE FROM {tbl}")
             self.commit()
+
+    def reset_runtime_tables(self) -> None:
+        """Alias for reset_mutable_tables."""
+        self.reset_mutable_tables()
+
